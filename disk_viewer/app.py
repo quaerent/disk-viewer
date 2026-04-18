@@ -15,9 +15,9 @@ from rich.text import Text
 CACHE_FILE = Path.home() / ".disk_viewer_cache.json"
 
 class SizeCache:
-    """Manages directory size caching with mtime validation."""
+    """Manages directory size caching with mtime_ns validation."""
     def __init__(self):
-        self.cache: Dict[str, List] = {} # path -> [size, mtime]
+        self.cache: Dict[str, List] = {} # path -> [size, mtime_ns]
         self.load()
 
     def load(self):
@@ -38,41 +38,44 @@ class SizeCache:
     def get(self, path: Path) -> int | None:
         path_str = str(path.absolute())
         if path_str in self.cache:
-            cached_size, cached_mtime = self.cache[path_str]
+            cached_size, cached_mtime_ns = self.cache[path_str]
             try:
-                # Validate mtime
-                if path.lstat().st_mtime == cached_mtime:
+                # Use nanosecond precision for reliable validation
+                if path.lstat().st_mtime_ns == cached_mtime_ns:
                     return cached_size
             except (PermissionError, FileNotFoundError):
                 pass
         return None
 
-    def set(self, path: Path, size: int, mtime: float):
-        self.cache[str(path.absolute())] = [size, mtime]
+    def set(self, path: Path, size: int, mtime_ns: int):
+        self.cache[str(path.absolute())] = [size, mtime_ns]
 
-def get_recursive_size(path: Path, cache: SizeCache) -> int:
-    """Calculate actual disk usage recursively, handling sparse files."""
+def get_recursive_size(path: Path, cache: SizeCache, bypass_cache: bool = False) -> int:
+    """Calculate actual disk usage recursively, optionally bypassing cache."""
     try:
         st = path.lstat()
         if stat.S_ISLNK(st.st_mode):
             return 0
         
-        # Check cache for directories
+        # Check cache for directories if not bypassing
         if stat.S_ISDIR(st.st_mode):
-            cached_val = cache.get(path)
-            if cached_val is not None:
-                return cached_val
+            if not bypass_cache:
+                cached_val = cache.get(path)
+                if cached_val is not None:
+                    return cached_val
 
             total_size = 0
-            for entry in os.scandir(path):
-                total_size += get_recursive_size(Path(entry.path), cache)
+            try:
+                for entry in os.scandir(path):
+                    total_size += get_recursive_size(Path(entry.path), cache, bypass_cache)
+            except (PermissionError, FileNotFoundError):
+                pass
             
-            # Store directory size in cache
-            cache.set(path, total_size, st.st_mtime)
+            # Store directory size in cache with ns precision
+            cache.set(path, total_size, st.st_mtime_ns)
             return total_size
         else:
-            # Use st_blocks * 512 for actual disk usage (sparse files)
-            # st_blocks is the number of 512-byte blocks allocated
+            # Actual usage for files
             return st.st_blocks * 512
     except (PermissionError, FileNotFoundError):
         return 0
@@ -93,7 +96,7 @@ class SizeUpdate(Message):
         super().__init__()
 
 class DiskViewer(App):
-    """A CUI disk space visualization tool with caching."""
+    """A CUI disk space visualization tool with robust caching."""
 
     CSS = """
     DataTable {
@@ -132,25 +135,18 @@ class DiskViewer(App):
             return
         
         self.is_loading = True
-        self.sub_title = f"Scanning {self.current_path}..."
+        self.sub_title = f"{'Deep Scanning' if force else 'Scanning'} {self.current_path}..."
         
-        # If forced, clear current path from cache to trigger re-scan
-        if force:
-            path_str = str(self.current_path.absolute())
-            if path_str in self.size_cache.cache:
-                del self.size_cache.cache[path_str]
+        self.run_worker(self.calculate_sizes(self.current_path, bypass_cache=force))
 
-        self.run_worker(self.calculate_sizes(self.current_path))
-
-    async def calculate_sizes(self, path: Path):
+    async def calculate_sizes(self, path: Path, bypass_cache: bool = False):
         items: List[Tuple[str, int, str]] = []
         try:
             entries = list(os.scandir(path))
             for entry in entries:
                 p = Path(entry.path)
                 item_type = "Folder" if entry.is_dir() else "File"
-                # This will use cache if available and populate it for all subdirs
-                size = await asyncio.to_thread(get_recursive_size, p, self.size_cache)
+                size = await asyncio.to_thread(get_recursive_size, p, self.size_cache, bypass_cache)
                 items.append((entry.name, size, item_type))
         except (PermissionError, FileNotFoundError):
             pass
@@ -158,7 +154,6 @@ class DiskViewer(App):
         items.sort(key=lambda x: x[1], reverse=True)
         self.post_message(SizeUpdate(path, items))
         
-        # Save cache to disk after a major scan
         await asyncio.to_thread(self.size_cache.save)
 
     def on_size_update(self, message: SizeUpdate) -> None:

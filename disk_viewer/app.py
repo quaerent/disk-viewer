@@ -48,7 +48,21 @@ class SizeCache:
         return None
 
     def set(self, path: Path, size: int, mtime_ns: int):
-        self.cache[str(path.absolute())] = [size, mtime_ns]
+        path_str = str(path.absolute())
+        old_data = self.cache.get(path_str)
+        
+        # Update current path
+        self.cache[path_str] = [size, mtime_ns]
+        
+        # If size changed, invalidate parents in cache to force them to recalculate
+        if old_data is None or old_data[0] != size:
+            current = path.parent
+            # Invalidate up to root
+            while str(current) != str(current.parent):
+                parent_str = str(current.absolute())
+                if parent_str in self.cache:
+                    del self.cache[parent_str]
+                current = current.parent
 
 def get_recursive_size(path: Path, cache: SizeCache, bypass_cache: bool = False) -> int:
     """Calculate actual disk usage recursively, optionally bypassing cache."""

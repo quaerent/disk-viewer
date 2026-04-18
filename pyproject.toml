@@ -1,0 +1,20 @@
+[project]
+name = "disk-viewer"
+version = "0.1.0"
+description = "A Python-based CUI tool to visualize disk space usage on macOS."
+authors = [
+    {name = "Orthopole"}
+]
+requires-python = "^3.10"
+dependencies = [
+    "textual (>=8.2.3,<9.0.0)",
+    "rich (>=15.0.0,<16.0.0)"
+]
+
+[project.scripts]
+disk-viewer = "disk_viewer.app:main"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

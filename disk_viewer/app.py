@@ -128,7 +128,6 @@ class DiskViewer(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("enter", "enter_dir", "Enter Dir"),
         ("backspace", "back_dir", "Back"),
         ("u", "back_dir", "Up"),
         ("r", "refresh", "Refresh"),
@@ -215,15 +214,6 @@ class DiskViewer(App):
             if new_path.is_dir():
                 self.current_path = new_path
                 self.refresh_table()
-
-    def action_enter_dir(self) -> None:
-        table = self.query_one(DataTable)
-        if table.cursor_row is not None:
-            try:
-                row_key = table.get_row_key_at(table.cursor_row)
-                self.on_data_table_row_selected(DataTable.RowSelected(table, row_key))
-            except Exception:
-                pass
 
     def action_back_dir(self) -> None:
         if self.is_loading:

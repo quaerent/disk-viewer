@@ -51,7 +51,7 @@ class SizeCache:
         self.cache[str(path.absolute())] = [size, mtime]
 
 def get_recursive_size(path: Path, cache: SizeCache) -> int:
-    """Calculate size recursively, utilizing and updating the cache."""
+    """Calculate actual disk usage recursively, handling sparse files."""
     try:
         st = path.lstat()
         if stat.S_ISLNK(st.st_mode):
@@ -71,8 +71,9 @@ def get_recursive_size(path: Path, cache: SizeCache) -> int:
             cache.set(path, total_size, st.st_mtime)
             return total_size
         else:
-            # For files, just return size (could cache these too, but less critical)
-            return st.st_size
+            # Use st_blocks * 512 for actual disk usage (sparse files)
+            # st_blocks is the number of 512-byte blocks allocated
+            return st.st_blocks * 512
     except (PermissionError, FileNotFoundError):
         return 0
 

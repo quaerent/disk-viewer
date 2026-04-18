@@ -87,6 +87,7 @@ class DiskViewer(App):
         table = self.query_one(DataTable)
         table.add_columns("Name", "Size", "Type")
         table.cursor_type = "row"
+        table.focus()
         self.refresh_table()
 
     def refresh_table(self) -> None:
@@ -134,7 +135,20 @@ class DiskViewer(App):
                 key=name
             )
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Handle row selection (Enter key or click)."""
+        if self.is_loading:
+            return
+        
+        selected_name = event.row_key.value
+        if selected_name:
+            new_path = self.current_path / selected_name
+            if new_path.is_dir():
+                self.current_path = new_path
+                self.refresh_table()
+
     def action_enter_dir(self) -> None:
+        """Fallback action for enter_dir binding."""
         if self.is_loading:
             return
         table = self.query_one(DataTable)

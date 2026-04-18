@@ -3,6 +3,7 @@ import sys
 import json
 import stat
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict
 from textual.app import App, ComposeResult
@@ -131,7 +132,18 @@ class DiskViewer(App):
         ("backspace", "back_dir", "Back"),
         ("u", "back_dir", "Up"),
         ("r", "refresh", "Refresh"),
+        ("c", "copy_path", "Copy Path"),
     ]
+
+    def action_copy_path(self) -> None:
+        """Copy the current directory path to the clipboard using macOS pbcopy."""
+        path_str = str(self.current_path.absolute())
+        try:
+            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, close_fds=True)
+            process.communicate(input=path_str.encode('utf-8'))
+            self.notify(f"Copied: {path_str}", severity="information", timeout=2)
+        except Exception as e:
+            self.notify(f"Copy failed: {e}", severity="error")
 
     def __init__(self, start_path: str = "."):
         super().__init__()

@@ -3,9 +3,9 @@ name = "disk-viewer"
 version = "0.1.0"
 description = "A Python-based CUI tool to visualize disk space usage on macOS."
 authors = [
-    {name = "Orthopole"}
+    {name = "Quaerent", email = "topfyf@qq.com"}
 ]
-requires-python = "^3.10"
+requires-python = ">=3.10,<4.0"
 dependencies = [
     "textual (>=8.2.3,<9.0.0)",
     "rich (>=15.0.0,<16.0.0)"

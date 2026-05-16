@@ -2,12 +2,13 @@ import os
 import sys
 import json
 import stat
+import shutil
 import asyncio
 import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable
+from textual.widgets import Header, Footer, DataTable, Static
 from textual.containers import Container
 from textual.message import Message
 from rich.text import Text
@@ -117,10 +118,39 @@ class SizeUpdate(Message):
         self.items = items
         super().__init__()
 
+class DiskUsageHeader(Static):
+    """A widget to display overall macOS disk usage."""
+    def on_mount(self) -> None:
+        self.update_usage()
+
+    def update_usage(self) -> None:
+        try:
+            usage = shutil.disk_usage("/")
+            total = format_size(usage.total)
+            used = format_size(usage.used)
+            free = format_size(usage.free)
+            percent = (usage.used / usage.total) * 100
+            self.update(Text.assemble(
+                ("Disk Usage: ", "bold"),
+                (f"Used: {used} / Total: {total} | ", "cyan"),
+                ("Free: ", "bold"),
+                (f"{free} ", "green"),
+                (f"({percent:.1f}% used)", "yellow"),
+            ))
+        except Exception:
+            self.update("Disk Usage: Unknown")
+
 class DiskViewer(App):
     """A CUI disk space visualization tool with robust caching."""
 
     CSS = """
+    DiskUsageHeader {
+        background: $primary;
+        color: $text;
+        padding: 0 1;
+        height: 1;
+        dock: top;
+    }
     DataTable {
         height: 100%;
     }
@@ -152,6 +182,7 @@ class DiskViewer(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield DiskUsageHeader()
         yield Container(DataTable(id="file-table"))
         yield Footer()
 
@@ -166,6 +197,12 @@ class DiskViewer(App):
         if self.is_loading:
             return
         
+        # Update overall disk usage
+        try:
+            self.query_one(DiskUsageHeader).update_usage()
+        except Exception:
+            pass
+
         self.is_loading = True
         self.sub_title = f"{'Deep Scanning' if force else 'Scanning'} {self.current_path}..."
         

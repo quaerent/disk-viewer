@@ -1,44 +1,63 @@
-# Disk Viewer
+# disk-viewer
 
-A simple CUI (Command-line User Interface) tool to visualize disk space usage on macOS, written in Python.
+A high-performance Terminal User Interface (TUI) tool designed for macOS to visualize disk space usage and identify large files/directories. Built with Python and the Textual framework.
 
-## Features
+## Key Features
 
-- **Recursive size calculation**: Shows the total size of files and directories.
-- **Interactive Navigation**: Enter directories with `Enter`, go back with `Backspace` or `U`.
-- **Sorted View**: Automatically sorts items by size (descending).
-- **Modern UI**: Built with `Textual` for a responsive and beautiful terminal experience.
+- **Recursive Disk Analysis**: Accurately calculates real disk usage using block allocation (handles sparse files like `Docker.raw` correctly).
+- **Persistent Caching**: Uses a high-precision nanosecond timestamp (mtime_ns) validation to cache directory sizes, enabling near-instant browsing of previously scanned paths.
+- **Delta-Based Updates**: Automatically propagates size changes up the directory tree without requiring full rescans.
+- **Interactive Navigation**: Fluent keyboard-driven interface to explore your filesystem.
+- **System Overview**: Displays global macOS disk usage (Total, Used, Free) at a glance.
+- **Clipboard Integration**: Quickly copy current paths to the clipboard for use in other terminal commands.
 
 ## Installation
 
 This project uses [Poetry](https://python-poetry.org/) for dependency management.
 
+### Prerequisites
+
+- Python 3.10 or higher.
+- macOS (for `pbcopy` support).
+
+### Setup
+
 ```bash
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/yourusername/disk-viewer.git
 cd disk-viewer
+
+# Install dependencies
 poetry install
 ```
 
 ## Usage
 
-Run the tool using Poetry:
+Start the tool using Poetry:
 
 ```bash
-poetry run disk-viewer [path]
+# Scan the current directory
+poetry run disk-viewer
+
+# Scan a specific path
+poetry run disk-viewer /Users/username/Downloads
 ```
 
-Or install it globally:
+### Controls
 
-```bash
-poetry build
-pip install dist/*.whl
-disk-viewer [path]
-```
+| Key | Action |
+|-----|--------|
+| `Enter` | Enter the selected directory |
+| `Backspace` / `u` | Go up to the parent directory |
+| `r` | **Deep Refresh**: Force a full recursive rescan of the current tree |
+| `c` | Copy the current absolute path to clipboard |
+| `q` | Quit the application |
+| `Arrows` | Navigate through the list |
 
-### Key Bindings
+## Performance
 
-- `q`: Quit
-- `Enter`: Enter selected directory
-- `Backspace` / `u`: Go up one directory level
-- `r`: Refresh current view
-- `Arrow Keys`: Navigate the list
+The tool utilizes asynchronous workers to keep the UI responsive during heavy disk I/O operations. Cached results are stored in `~/.disk_viewer_cache.json`.
+
+## License
+
+MIT
